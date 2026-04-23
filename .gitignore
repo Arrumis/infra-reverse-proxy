@@ -12,6 +12,9 @@ data/conf.d/*.conf
 !data/letsencrypt/.gitkeep
 !data/log/
 !data/log/.gitkeep
+data/log/*.log
 !data/log_letsencrypt/
 !data/log_letsencrypt/.gitkeep
+data/log_letsencrypt/*.log
+data/log_letsencrypt/*.log.*
 .htpasswd
