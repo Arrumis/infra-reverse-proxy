@@ -23,6 +23,7 @@ MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
 TATEGAKI_HOST="${TATEGAKI_HOST:-tategaki.${DOMAIN}}"
 SYNCTHING_HOST="${SYNCTHING_HOST:-syncthing.${DOMAIN}}"
 OPENVPN_HOST="${OPENVPN_HOST:-openvpn.${DOMAIN}}"
+TRAEFIK_HOST="${TRAEFIK_HOST:-traefik.${DOMAIN}}"
 EPGREC_HOST="${EPGREC_HOST:-epgrec.${DOMAIN}}"
 EPGSTATION_HOST="${EPGSTATION_HOST:-${EPGREC_HOST}}"
 MIRAKURUN_HOST="${MIRAKURUN_HOST:-mirakurun.${DOMAIN}}"
@@ -38,6 +39,7 @@ EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM:-127.0.0.1:8888}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 
 mkdir -p data/conf.d data/html/.well-known/acme-challenge data/letsencrypt data/log data/log_letsencrypt
+mkdir -p data/html/proxy-dashboard
 
 rm -f \
   data/conf.d/default.conf \
@@ -46,6 +48,7 @@ rm -f \
   data/conf.d/tategaki-http.conf \
   data/conf.d/syncthing-http.conf \
   data/conf.d/openvpn-http.conf \
+  data/conf.d/traefik-http.conf \
   data/conf.d/mirakurun-http.conf \
   data/conf.d/epgstation-http.conf \
   data/conf.d/wordpress-https.conf \
@@ -54,9 +57,12 @@ rm -f \
   data/conf.d/tategaki-https.conf \
   data/conf.d/syncthing-https.conf \
   data/conf.d/openvpn-https.conf \
+  data/conf.d/traefik-https.conf \
   data/conf.d/mirakurun-https.conf \
   data/conf.d/epgstation-https.conf
 cp templates/logformat.conf data/conf.d/logformat.conf
+envsubst '${ROOT_HOST} ${TTRSS_HOST} ${MUNIN_HOST} ${TATEGAKI_HOST} ${SYNCTHING_HOST} ${OPENVPN_HOST} ${TRAEFIK_HOST} ${EPGREC_HOST} ${MIRAKURUN_HOST} ${TLS_CERT_NAME}' \
+  < templates/proxy_dashboard.html > data/html/proxy-dashboard/index.html
 
 case "${MODE}" in
   http)
@@ -66,6 +72,7 @@ case "${MODE}" in
     envsubst '${TATEGAKI_HOST} ${TATEGAKI_UPSTREAM}' < templates/tategaki_http.conf > data/conf.d/tategaki-http.conf
     envsubst '${SYNCTHING_HOST} ${SYNCTHING_UPSTREAM}' < templates/syncthing_http.conf > data/conf.d/syncthing-http.conf
     envsubst '${OPENVPN_HOST} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_http.conf > data/conf.d/openvpn-http.conf
+    envsubst '${TRAEFIK_HOST}' < templates/traefik_http.conf > data/conf.d/traefik-http.conf
     envsubst '${MIRAKURUN_HOST} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_http.conf > data/conf.d/mirakurun-http.conf
     envsubst '${EPGREC_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgstation-http.conf
     ;;
@@ -76,6 +83,7 @@ case "${MODE}" in
     envsubst '${TATEGAKI_HOST}' < templates/tategaki_http_redirect.conf > data/conf.d/tategaki-http.conf
     envsubst '${SYNCTHING_HOST}' < templates/syncthing_http_redirect.conf > data/conf.d/syncthing-http.conf
     envsubst '${OPENVPN_HOST}' < templates/openvpn_http_redirect.conf > data/conf.d/openvpn-http.conf
+    envsubst '${TRAEFIK_HOST}' < templates/traefik_http_redirect.conf > data/conf.d/traefik-http.conf
     envsubst '${MIRAKURUN_HOST}' < templates/mirakurun_http_redirect.conf > data/conf.d/mirakurun-http.conf
     envsubst '${EPGREC_HOST}' < templates/epgstation_http_redirect.conf > data/conf.d/epgstation-http.conf
     DOMAIN="${DOMAIN}" ROOT_HOST="${ROOT_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM}" \
@@ -90,6 +98,8 @@ case "${MODE}" in
       envsubst '${DOMAIN} ${SYNCTHING_HOST} ${TLS_CERT_NAME} ${SYNCTHING_UPSTREAM}' < templates/syncthing_proxy.conf > data/conf.d/syncthing-https.conf
     DOMAIN="${DOMAIN}" OPENVPN_HOST="${OPENVPN_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" OPENVPN_ADMIN_UPSTREAM="${OPENVPN_ADMIN_UPSTREAM}" OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM}" \
       envsubst '${DOMAIN} ${OPENVPN_HOST} ${TLS_CERT_NAME} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_proxy.conf > data/conf.d/openvpn-https.conf
+    DOMAIN="${DOMAIN}" TRAEFIK_HOST="${TRAEFIK_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" \
+      envsubst '${DOMAIN} ${TRAEFIK_HOST} ${TLS_CERT_NAME}' < templates/traefik_proxy.conf > data/conf.d/traefik-https.conf
     DOMAIN="${DOMAIN}" MIRAKURUN_HOST="${MIRAKURUN_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM}" \
       envsubst '${DOMAIN} ${MIRAKURUN_HOST} ${TLS_CERT_NAME} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_proxy.conf > data/conf.d/mirakurun-https.conf
     DOMAIN="${DOMAIN}" EPGREC_HOST="${EPGREC_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \

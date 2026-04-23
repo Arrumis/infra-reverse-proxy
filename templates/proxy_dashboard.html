@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proxy Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --card: #fffdf8;
+      --line: #d8cfc3;
+      --text: #2b261f;
+      --muted: #6d655a;
+      --accent: #8a4b2a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+      background:
+        radial-gradient(circle at top right, #f1d9bf 0, transparent 28%),
+        linear-gradient(180deg, #f8f4ee 0%, var(--bg) 100%);
+      color: var(--text);
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: 0.04em;
+    }
+    p {
+      margin: 0 0 16px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px 18px;
+      box-shadow: 0 12px 30px rgba(62, 44, 28, 0.06);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+    .card a {
+      color: var(--accent);
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .card a:hover {
+      text-decoration: underline;
+    }
+    .meta {
+      margin-top: 28px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid var(--line);
+      font-size: 0.95rem;
+    }
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Proxy Dashboard</h1>
+    <p>
+      このページは旧「traefik 管理画面」互換の入口です。現在の正本は <code>infra-reverse-proxy</code>
+      の <code>nginx</code> 構成で、各サービスは以下の公開URLに振り分けています。
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>WordPress</h2>
+        <a href="https://${ROOT_HOST}/">https://${ROOT_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>ttrss</h2>
+        <a href="https://${TTRSS_HOST}/tt-rss/">https://${TTRSS_HOST}/tt-rss/</a>
+      </section>
+      <section class="card">
+        <h2>Munin</h2>
+        <a href="https://${MUNIN_HOST}/">https://${MUNIN_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>tategaki</h2>
+        <a href="https://${TATEGAKI_HOST}/">https://${TATEGAKI_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>Syncthing</h2>
+        <a href="https://${SYNCTHING_HOST}/">https://${SYNCTHING_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>OpenVPN</h2>
+        <a href="https://${OPENVPN_HOST}/">https://${OPENVPN_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>Mirakurun</h2>
+        <a href="https://${MIRAKURUN_HOST}/">https://${MIRAKURUN_HOST}/</a>
+      </section>
+      <section class="card">
+        <h2>EPGStation</h2>
+        <a href="https://${EPGREC_HOST}/">https://${EPGREC_HOST}/</a>
+      </section>
+    </div>
+
+    <div class="meta">
+      <strong>Proxy Host</strong>: <code>${TRAEFIK_HOST}</code><br>
+      <strong>TLS Cert</strong>: <code>${TLS_CERT_NAME}</code><br>
+      <strong>Proxy Engine</strong>: <code>nginx</code>
+    </div>
+  </main>
+</body>
+</html>
