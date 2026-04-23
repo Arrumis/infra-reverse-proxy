@@ -66,6 +66,7 @@ emit_tls_router() {
   local rule="$2"
   local service="$3"
   local priority="${4:-100}"
+  local middlewares="${5:-}"
 
   cat >>"${routers_tmp}" <<EOF
     ${name}-https:
@@ -73,6 +74,14 @@ emit_tls_router() {
         - websecure
       rule: "${rule}"
       priority: ${priority}
+EOF
+  if [[ -n "${middlewares}" ]]; then
+    cat >>"${routers_tmp}" <<EOF
+      middlewares:
+${middlewares}
+EOF
+  fi
+  cat >>"${routers_tmp}" <<EOF
       service: ${service}
       tls:
         certResolver: letsencrypt
@@ -104,9 +113,10 @@ emit_standard_host() {
   local host="$2"
   local url="$3"
   local transport="${4:-}"
+  local middlewares="${5:-}"
 
   emit_redirect_router "${name}" "Host(\`${host}\`)" "${name}" 100
-  emit_tls_router "${name}" "Host(\`${host}\`)" "${name}" 100
+  emit_tls_router "${name}" "Host(\`${host}\`)" "${name}" 100 "${middlewares}"
   emit_service_url "${name}" "${url}" "${transport}"
 }
 
@@ -114,11 +124,11 @@ emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
 emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
 emit_standard_host "tategaki" "${TATEGAKI_HOST}" "http://${TATEGAKI_UPSTREAM}"
 emit_standard_host "syncthing" "${SYNCTHING_HOST}" "http://${SYNCTHING_UPSTREAM}"
-emit_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}"
-emit_standard_host "epgrec" "${EPGREC_HOST}" "http://${EPGSTATION_UPSTREAM}"
+emit_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}" "" $'        - protected-basic-auth'
+emit_standard_host "epgrec" "${EPGREC_HOST}" "http://${EPGSTATION_UPSTREAM}" "" $'        - protected-basic-auth'
 
 if [[ "${EPGSTATION_HOST}" != "${EPGREC_HOST}" ]]; then
-  emit_standard_host "epgstation" "${EPGSTATION_HOST}" "http://${EPGSTATION_UPSTREAM}"
+  emit_standard_host "epgstation" "${EPGSTATION_HOST}" "http://${EPGSTATION_UPSTREAM}" "" $'        - protected-basic-auth'
 fi
 
 emit_redirect_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`/admin\`)" "openvpn-admin" 200
@@ -138,6 +148,7 @@ cat >>"${routers_tmp}" <<EOF
       rule: "Host(\`${MUNIN_HOST}\`)"
       priority: 100
       middlewares:
+        - protected-basic-auth
         - munin-prefix
       service: munin
       tls:
@@ -150,6 +161,7 @@ cat >>"${routers_tmp}" <<EOF
         - websecure
       rule: "Host(\`${TRAEFIK_HOST}\`) && Path(\`/\`)"
       middlewares:
+        - protected-basic-auth
         - traefik-dashboard-root
       priority: 200
       service: api@internal
@@ -160,6 +172,8 @@ cat >>"${routers_tmp}" <<EOF
         - websecure
       rule: "Host(\`${TRAEFIK_HOST}\`) && (PathPrefix(\`/api\`) || PathPrefix(\`/dashboard\`))"
       priority: 100
+      middlewares:
+        - protected-basic-auth
       service: api@internal
       tls:
         certResolver: letsencrypt
@@ -206,6 +220,9 @@ http:
       redirectScheme:
         scheme: https
         permanent: true
+    protected-basic-auth:
+      basicAuth:
+        usersFile: /etc/traefik/.htpasswd
     traefik-dashboard-root:
       redirectRegex:
         regex: "^https?://([^/]+)/?$"

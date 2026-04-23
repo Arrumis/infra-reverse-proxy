@@ -8,5 +8,6 @@ services:
       - ./data/traefik/dynamic:/etc/traefik/dynamic:ro
       - ./data/letsencrypt:/letsencrypt
       - ./data/log:/var/log/traefik
+      - ./.htpasswd:/etc/traefik/.htpasswd:ro
     environment:
       TZ: "${TZ:-Asia/Tokyo}"
