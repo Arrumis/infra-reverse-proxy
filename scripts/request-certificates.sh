@@ -14,6 +14,7 @@ ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
 MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
+TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 
 ./scripts/render-configs.sh http
 docker compose --env-file "${ENV_FILE}" up -d
@@ -23,6 +24,8 @@ docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot ce
   --agree-tos \
   --email "${LETSENCRYPT_EMAIL}" \
   --non-interactive \
+  --cert-name "${TLS_CERT_NAME}" \
+  --expand \
   -d "${ROOT_HOST}" \
   -d "${TTRSS_HOST}" \
   -d "${MUNIN_HOST}"
