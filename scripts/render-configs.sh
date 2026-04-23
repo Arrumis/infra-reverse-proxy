@@ -19,27 +19,33 @@ fi
 DOMAIN="${DOMAIN:-example.local}"
 ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
+MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
 WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM:-127.0.0.1:8080}"
 TTRSS_UPSTREAM="${TTRSS_UPSTREAM:-127.0.0.1:8280}"
+MUNIN_UPSTREAM="${MUNIN_UPSTREAM:-127.0.0.1:8081}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 
 mkdir -p data/conf.d data/html/.well-known/acme-challenge data/letsencrypt data/log data/log_letsencrypt
 
-rm -f data/conf.d/default.conf data/conf.d/ttrss-http.conf data/conf.d/wordpress-https.conf data/conf.d/ttrss-https.conf
+rm -f data/conf.d/default.conf data/conf.d/ttrss-http.conf data/conf.d/munin-http.conf data/conf.d/wordpress-https.conf data/conf.d/ttrss-https.conf data/conf.d/munin-https.conf
 cp templates/logformat.conf data/conf.d/logformat.conf
 
 case "${MODE}" in
   http)
     envsubst '${ROOT_HOST} ${WORDPRESS_UPSTREAM}' < templates/wordpress_http.conf > data/conf.d/default.conf
     envsubst '${TTRSS_HOST} ${TTRSS_UPSTREAM}' < templates/ttrss_http.conf > data/conf.d/ttrss-http.conf
+    envsubst '${MUNIN_HOST} ${MUNIN_UPSTREAM}' < templates/munin_http.conf > data/conf.d/munin-http.conf
     ;;
   https)
     envsubst '${ROOT_HOST}' < templates/wordpress_http_redirect.conf > data/conf.d/default.conf
     envsubst '${TTRSS_HOST}' < templates/ttrss_http_redirect.conf > data/conf.d/ttrss-http.conf
+    envsubst '${MUNIN_HOST}' < templates/munin_http_redirect.conf > data/conf.d/munin-http.conf
     DOMAIN="${DOMAIN}" ROOT_HOST="${ROOT_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM}" \
       envsubst '${DOMAIN} ${ROOT_HOST} ${TLS_CERT_NAME} ${WORDPRESS_UPSTREAM}' < templates/wordpress_proxy.conf > data/conf.d/wordpress-https.conf
     DOMAIN="${DOMAIN}" TTRSS_HOST="${TTRSS_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" TTRSS_UPSTREAM="${TTRSS_UPSTREAM}" \
       envsubst '${DOMAIN} ${TTRSS_HOST} ${TLS_CERT_NAME} ${TTRSS_UPSTREAM}' < templates/ttrss_proxy.conf > data/conf.d/ttrss-https.conf
+    DOMAIN="${DOMAIN}" MUNIN_HOST="${MUNIN_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" MUNIN_UPSTREAM="${MUNIN_UPSTREAM}" \
+      envsubst '${DOMAIN} ${MUNIN_HOST} ${TLS_CERT_NAME} ${MUNIN_UPSTREAM}' < templates/munin_proxy.conf > data/conf.d/munin-https.conf
     ;;
   *)
     echo "Usage: $0 [http|https]"
