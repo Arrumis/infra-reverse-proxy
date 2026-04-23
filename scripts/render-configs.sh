@@ -9,13 +9,6 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-MODE="${1:-http}"
-
-if ! command -v envsubst >/dev/null 2>&1; then
-  echo "envsubst is required"
-  exit 1
-fi
-
 DOMAIN="${DOMAIN:-example.local}"
 ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
@@ -36,158 +29,184 @@ OPENVPN_ADMIN_UPSTREAM="${OPENVPN_ADMIN_UPSTREAM:-127.0.0.1:943}"
 OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM:-127.0.0.1:9443}"
 MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM:-127.0.0.1:40772}"
 EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM:-127.0.0.1:8888}"
-TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
+LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
+HTTP_PORT="${HTTP_PORT:-80}"
+HTTPS_PORT="${HTTPS_PORT:-443}"
+TRAEFIK_LOG_LEVEL="${TRAEFIK_LOG_LEVEL:-INFO}"
 
-mkdir -p data/conf.d data/html/.well-known/acme-challenge data/letsencrypt data/log data/log_letsencrypt
-mkdir -p data/html/proxy-dashboard
+mkdir -p data/traefik/dynamic data/letsencrypt data/log
 
-has_cert() {
-  local cert_name="$1"
+static_config="data/traefik/traefik.yml"
+dynamic_config="data/traefik/dynamic/routes.yml"
+routers_tmp="$(mktemp)"
+services_tmp="$(mktemp)"
+trap 'rm -f "${routers_tmp}" "${services_tmp}"' EXIT
 
-  [[ -z "${cert_name}" ]] && return 1
+emit_redirect_router() {
+  local name="$1"
+  local rule="$2"
+  local service="$3"
+  local priority="${4:-100}"
 
-  if [[ -f "data/letsencrypt/renewal/${cert_name}.conf" ]]; then
-    return 0
-  fi
-
-  if [[ -f "data/letsencrypt/live/${cert_name}/fullchain.pem" && -f "data/letsencrypt/live/${cert_name}/privkey.pem" ]]; then
-    return 0
-  fi
-
-  return 1
+  cat >>"${routers_tmp}" <<EOF
+    ${name}-http:
+      entryPoints:
+        - web
+      rule: "${rule}"
+      middlewares:
+        - https-redirect
+      priority: ${priority}
+      service: ${service}
+EOF
 }
 
-rm -f \
-  data/conf.d/default.conf \
-  data/conf.d/ttrss-http.conf \
-  data/conf.d/munin-http.conf \
-  data/conf.d/tategaki-http.conf \
-  data/conf.d/syncthing-http.conf \
-  data/conf.d/openvpn-http.conf \
-  data/conf.d/traefik-http.conf \
-  data/conf.d/mirakurun-http.conf \
-  data/conf.d/epgrec-http.conf \
-  data/conf.d/epgstation-http.conf \
-  data/conf.d/wordpress-https.conf \
-  data/conf.d/ttrss-https.conf \
-  data/conf.d/munin-https.conf \
-  data/conf.d/tategaki-https.conf \
-  data/conf.d/syncthing-https.conf \
-  data/conf.d/openvpn-https.conf \
-  data/conf.d/traefik-https.conf \
-  data/conf.d/mirakurun-https.conf \
-  data/conf.d/epgrec-https.conf \
-  data/conf.d/epgstation-https.conf
-cp templates/logformat.conf data/conf.d/logformat.conf
-envsubst '${ROOT_HOST} ${TTRSS_HOST} ${MUNIN_HOST} ${TATEGAKI_HOST} ${SYNCTHING_HOST} ${OPENVPN_HOST} ${TRAEFIK_HOST} ${EPGREC_HOST} ${MIRAKURUN_HOST} ${TLS_CERT_NAME}' \
-  < templates/proxy_dashboard.html > data/html/proxy-dashboard/index.html
+emit_tls_router() {
+  local name="$1"
+  local rule="$2"
+  local service="$3"
+  local priority="${4:-100}"
 
-case "${MODE}" in
-  http)
-    envsubst '${ROOT_HOST} ${WORDPRESS_UPSTREAM}' < templates/wordpress_http.conf > data/conf.d/default.conf
-    envsubst '${TTRSS_HOST} ${TTRSS_UPSTREAM}' < templates/ttrss_http.conf > data/conf.d/ttrss-http.conf
-    envsubst '${MUNIN_HOST} ${MUNIN_UPSTREAM}' < templates/munin_http.conf > data/conf.d/munin-http.conf
-    envsubst '${TATEGAKI_HOST} ${TATEGAKI_UPSTREAM}' < templates/tategaki_http.conf > data/conf.d/tategaki-http.conf
-    envsubst '${SYNCTHING_HOST} ${SYNCTHING_UPSTREAM}' < templates/syncthing_http.conf > data/conf.d/syncthing-http.conf
-    envsubst '${OPENVPN_HOST} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_http.conf > data/conf.d/openvpn-http.conf
-    envsubst '${TRAEFIK_HOST}' < templates/traefik_http.conf > data/conf.d/traefik-http.conf
-    envsubst '${MIRAKURUN_HOST} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_http.conf > data/conf.d/mirakurun-http.conf
-    SERVER_HOST="${EPGREC_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-      envsubst '${SERVER_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgrec-http.conf
-    if [[ "${EPGSTATION_HOST}" != "${EPGREC_HOST}" ]]; then
-      SERVER_HOST="${EPGSTATION_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-        envsubst '${SERVER_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgstation-http.conf
-    fi
-    ;;
-  https)
-    if has_cert "${ROOT_HOST}"; then
-      envsubst '${ROOT_HOST}' < templates/wordpress_http_redirect.conf > data/conf.d/default.conf
-      DOMAIN="${DOMAIN}" ROOT_HOST="${ROOT_HOST}" CERT_NAME="${ROOT_HOST}" WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM}" \
-        envsubst '${DOMAIN} ${ROOT_HOST} ${CERT_NAME} ${WORDPRESS_UPSTREAM}' < templates/wordpress_proxy.conf > data/conf.d/wordpress-https.conf
-    else
-      envsubst '${ROOT_HOST} ${WORDPRESS_UPSTREAM}' < templates/wordpress_http.conf > data/conf.d/default.conf
-    fi
+  cat >>"${routers_tmp}" <<EOF
+    ${name}-https:
+      entryPoints:
+        - websecure
+      rule: "${rule}"
+      priority: ${priority}
+      service: ${service}
+      tls:
+        certResolver: letsencrypt
+EOF
+}
 
-    if has_cert "${TTRSS_HOST}"; then
-      envsubst '${TTRSS_HOST}' < templates/ttrss_http_redirect.conf > data/conf.d/ttrss-http.conf
-      DOMAIN="${DOMAIN}" TTRSS_HOST="${TTRSS_HOST}" CERT_NAME="${TTRSS_HOST}" TTRSS_UPSTREAM="${TTRSS_UPSTREAM}" \
-        envsubst '${DOMAIN} ${TTRSS_HOST} ${CERT_NAME} ${TTRSS_UPSTREAM}' < templates/ttrss_proxy.conf > data/conf.d/ttrss-https.conf
-    else
-      envsubst '${TTRSS_HOST} ${TTRSS_UPSTREAM}' < templates/ttrss_http.conf > data/conf.d/ttrss-http.conf
-    fi
+emit_service_url() {
+  local name="$1"
+  local url="$2"
+  local transport="${3:-}"
 
-    if has_cert "${MUNIN_HOST}"; then
-      envsubst '${MUNIN_HOST}' < templates/munin_http_redirect.conf > data/conf.d/munin-http.conf
-      DOMAIN="${DOMAIN}" MUNIN_HOST="${MUNIN_HOST}" CERT_NAME="${MUNIN_HOST}" MUNIN_UPSTREAM="${MUNIN_UPSTREAM}" \
-        envsubst '${DOMAIN} ${MUNIN_HOST} ${CERT_NAME} ${MUNIN_UPSTREAM}' < templates/munin_proxy.conf > data/conf.d/munin-https.conf
-    else
-      envsubst '${MUNIN_HOST} ${MUNIN_UPSTREAM}' < templates/munin_http.conf > data/conf.d/munin-http.conf
-    fi
+  cat >>"${services_tmp}" <<EOF
+    ${name}:
+      loadBalancer:
+EOF
+  if [[ -n "${transport}" ]]; then
+    cat >>"${services_tmp}" <<EOF
+        serversTransport: ${transport}
+EOF
+  fi
+  cat >>"${services_tmp}" <<EOF
+        servers:
+          - url: "${url}"
+EOF
+}
 
-    if has_cert "${TATEGAKI_HOST}"; then
-      envsubst '${TATEGAKI_HOST}' < templates/tategaki_http_redirect.conf > data/conf.d/tategaki-http.conf
-      DOMAIN="${DOMAIN}" TATEGAKI_HOST="${TATEGAKI_HOST}" CERT_NAME="${TATEGAKI_HOST}" TATEGAKI_UPSTREAM="${TATEGAKI_UPSTREAM}" \
-        envsubst '${DOMAIN} ${TATEGAKI_HOST} ${CERT_NAME} ${TATEGAKI_UPSTREAM}' < templates/tategaki_proxy.conf > data/conf.d/tategaki-https.conf
-    else
-      envsubst '${TATEGAKI_HOST} ${TATEGAKI_UPSTREAM}' < templates/tategaki_http.conf > data/conf.d/tategaki-http.conf
-    fi
+emit_standard_host() {
+  local name="$1"
+  local host="$2"
+  local url="$3"
+  local transport="${4:-}"
 
-    if has_cert "${SYNCTHING_HOST}"; then
-      envsubst '${SYNCTHING_HOST}' < templates/syncthing_http_redirect.conf > data/conf.d/syncthing-http.conf
-      DOMAIN="${DOMAIN}" SYNCTHING_HOST="${SYNCTHING_HOST}" CERT_NAME="${SYNCTHING_HOST}" SYNCTHING_UPSTREAM="${SYNCTHING_UPSTREAM}" \
-        envsubst '${DOMAIN} ${SYNCTHING_HOST} ${CERT_NAME} ${SYNCTHING_UPSTREAM}' < templates/syncthing_proxy.conf > data/conf.d/syncthing-https.conf
-    else
-      envsubst '${SYNCTHING_HOST} ${SYNCTHING_UPSTREAM}' < templates/syncthing_http.conf > data/conf.d/syncthing-http.conf
-    fi
+  emit_redirect_router "${name}" "Host(\`${host}\`)" "${name}" 100
+  emit_tls_router "${name}" "Host(\`${host}\`)" "${name}" 100
+  emit_service_url "${name}" "${url}" "${transport}"
+}
 
-    if has_cert "${OPENVPN_HOST}"; then
-      envsubst '${OPENVPN_HOST}' < templates/openvpn_http_redirect.conf > data/conf.d/openvpn-http.conf
-      DOMAIN="${DOMAIN}" OPENVPN_HOST="${OPENVPN_HOST}" CERT_NAME="${OPENVPN_HOST}" OPENVPN_ADMIN_UPSTREAM="${OPENVPN_ADMIN_UPSTREAM}" OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM}" \
-        envsubst '${DOMAIN} ${OPENVPN_HOST} ${CERT_NAME} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_proxy.conf > data/conf.d/openvpn-https.conf
-    else
-      envsubst '${OPENVPN_HOST} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_http.conf > data/conf.d/openvpn-http.conf
-    fi
+emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
+emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
+emit_standard_host "munin" "${MUNIN_HOST}" "http://${MUNIN_UPSTREAM}/munin/"
+emit_standard_host "tategaki" "${TATEGAKI_HOST}" "http://${TATEGAKI_UPSTREAM}"
+emit_standard_host "syncthing" "${SYNCTHING_HOST}" "http://${SYNCTHING_UPSTREAM}"
+emit_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}"
+emit_standard_host "epgrec" "${EPGREC_HOST}" "http://${EPGSTATION_UPSTREAM}"
 
-    if has_cert "${TRAEFIK_HOST}"; then
-      envsubst '${TRAEFIK_HOST}' < templates/traefik_http_redirect.conf > data/conf.d/traefik-http.conf
-      DOMAIN="${DOMAIN}" TRAEFIK_HOST="${TRAEFIK_HOST}" CERT_NAME="${TRAEFIK_HOST}" \
-        envsubst '${DOMAIN} ${TRAEFIK_HOST} ${CERT_NAME}' < templates/traefik_proxy.conf > data/conf.d/traefik-https.conf
-    else
-      envsubst '${TRAEFIK_HOST}' < templates/traefik_http.conf > data/conf.d/traefik-http.conf
-    fi
+if [[ "${EPGSTATION_HOST}" != "${EPGREC_HOST}" ]]; then
+  emit_standard_host "epgstation" "${EPGSTATION_HOST}" "http://${EPGSTATION_UPSTREAM}"
+fi
 
-    if has_cert "${MIRAKURUN_HOST}"; then
-      envsubst '${MIRAKURUN_HOST}' < templates/mirakurun_http_redirect.conf > data/conf.d/mirakurun-http.conf
-      DOMAIN="${DOMAIN}" MIRAKURUN_HOST="${MIRAKURUN_HOST}" CERT_NAME="${MIRAKURUN_HOST}" MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM}" \
-        envsubst '${DOMAIN} ${MIRAKURUN_HOST} ${CERT_NAME} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_proxy.conf > data/conf.d/mirakurun-https.conf
-    else
-      envsubst '${MIRAKURUN_HOST} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_http.conf > data/conf.d/mirakurun-http.conf
-    fi
+emit_redirect_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`/admin\`)" "openvpn-admin" 200
+emit_tls_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`/admin\`)" "openvpn-admin" 200
+emit_service_url "openvpn-admin" "https://${OPENVPN_ADMIN_UPSTREAM}" "insecure-skip-verify"
 
-    if has_cert "${EPGREC_HOST}"; then
-      SERVER_HOST="${EPGREC_HOST}" envsubst '${SERVER_HOST}' < templates/epgstation_http_redirect.conf > data/conf.d/epgrec-http.conf
-      DOMAIN="${DOMAIN}" SERVER_HOST="${EPGREC_HOST}" CERT_NAME="${EPGREC_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-        envsubst '${DOMAIN} ${SERVER_HOST} ${CERT_NAME} ${EPGSTATION_UPSTREAM}' < templates/epgstation_proxy.conf > data/conf.d/epgrec-https.conf
-    else
-      SERVER_HOST="${EPGREC_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-        envsubst '${SERVER_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgrec-http.conf
-    fi
+emit_redirect_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-client" 100
+emit_tls_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-client" 100
+emit_service_url "openvpn-client" "https://${OPENVPN_CLIENT_UPSTREAM}" "insecure-skip-verify"
 
-    if [[ "${EPGSTATION_HOST}" != "${EPGREC_HOST}" ]]; then
-      if has_cert "${EPGSTATION_HOST}"; then
-        SERVER_HOST="${EPGSTATION_HOST}" envsubst '${SERVER_HOST}' < templates/epgstation_http_redirect.conf > data/conf.d/epgstation-http.conf
-        DOMAIN="${DOMAIN}" SERVER_HOST="${EPGSTATION_HOST}" CERT_NAME="${EPGSTATION_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-          envsubst '${DOMAIN} ${SERVER_HOST} ${CERT_NAME} ${EPGSTATION_UPSTREAM}' < templates/epgstation_proxy.conf > data/conf.d/epgstation-https.conf
-      else
-        SERVER_HOST="${EPGSTATION_HOST}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-          envsubst '${SERVER_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgstation-http.conf
-      fi
-    fi
-    ;;
-  *)
-    echo "Usage: $0 [http|https]"
-    exit 1
-    ;;
-esac
+emit_redirect_router "traefik" "Host(\`${TRAEFIK_HOST}\`)" "api@internal" 100
+cat >>"${routers_tmp}" <<EOF
+    traefik-root-https:
+      entryPoints:
+        - websecure
+      rule: "Host(\`${TRAEFIK_HOST}\`) && Path(\`/\`)"
+      middlewares:
+        - traefik-dashboard-root
+      priority: 200
+      service: api@internal
+      tls:
+        certResolver: letsencrypt
+    traefik-dashboard-https:
+      entryPoints:
+        - websecure
+      rule: "Host(\`${TRAEFIK_HOST}\`) && (PathPrefix(\`/api\`) || PathPrefix(\`/dashboard\`))"
+      priority: 100
+      service: api@internal
+      tls:
+        certResolver: letsencrypt
+EOF
 
-echo "Rendered proxy configs for mode: ${MODE}"
+cat >"${static_config}" <<EOF
+api:
+  dashboard: true
+
+log:
+  level: ${TRAEFIK_LOG_LEVEL}
+
+accessLog:
+  filePath: /var/log/traefik/access.log
+
+entryPoints:
+  web:
+    address: :${HTTP_PORT}
+  websecure:
+    address: :${HTTPS_PORT}
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic/routes.yml
+    watch: true
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: ${LETSENCRYPT_EMAIL}
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+ping: {}
+EOF
+
+cat >"${dynamic_config}" <<EOF
+http:
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    traefik-dashboard-root:
+      redirectRegex:
+        regex: "^https?://([^/]+)/?$"
+        replacement: "https://\$\${1}/dashboard/"
+        permanent: true
+
+  serversTransports:
+    insecure-skip-verify:
+      insecureSkipVerify: true
+
+  routers:
+EOF
+cat "${routers_tmp}" >>"${dynamic_config}"
+cat >>"${dynamic_config}" <<EOF
+
+  services:
+EOF
+cat "${services_tmp}" >>"${dynamic_config}"
+
+echo "Rendered Traefik configuration."
