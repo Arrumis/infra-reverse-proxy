@@ -48,6 +48,7 @@ docker compose --env-file "${ENV_FILE}" up -d
 sleep 3
 
 failures=()
+soft_failures=()
 
 trigger_host() {
   local host="$1"
@@ -68,13 +69,21 @@ for item in "${checks[@]}"; do
   host="${item%%|*}"
   path="${item#*|}"
   if ! trigger_host "${host}" "${path}"; then
-    failures+=("${host}")
+    if [[ "${host}" == "${TRAEFIK_HOST}" ]]; then
+      soft_failures+=("${host}")
+    else
+      failures+=("${host}")
+    fi
   fi
 done
 
 if [[ "${#failures[@]}" -gt 0 ]]; then
   printf 'Certificate acquisition failed for:%s\n' " ${failures[*]}" >&2
   exit 1
+fi
+
+if [[ "${#soft_failures[@]}" -gt 0 ]]; then
+  printf 'Certificate acquisition warning for:%s\n' " ${soft_failures[*]}" >&2
 fi
 
 echo "Traefik ACME requests completed."
