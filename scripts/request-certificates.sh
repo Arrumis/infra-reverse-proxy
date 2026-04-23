@@ -22,6 +22,11 @@ EPGSTATION_HOST="${EPGSTATION_HOST:-${EPGREC_HOST}}"
 MIRAKURUN_HOST="${MIRAKURUN_HOST:-mirakurun.${DOMAIN}}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
+PREVIOUS_MODE="http"
+
+if [[ -f "data/letsencrypt/renewal/${TLS_CERT_NAME}.conf" ]] || [[ -f "data/letsencrypt/live/${TLS_CERT_NAME}/fullchain.pem" ]]; then
+  PREVIOUS_MODE="https"
+fi
 
 domains=()
 add_domain() {
@@ -50,6 +55,14 @@ add_domain "${MIRAKURUN_HOST}"
 add_domain "${EPGREC_HOST}"
 add_domain "${EPGSTATION_HOST}"
 
+restore_previous_mode() {
+  ./scripts/render-configs.sh "${PREVIOUS_MODE}"
+  docker compose --env-file "${ENV_FILE}" up -d
+  if docker compose --env-file "${ENV_FILE}" exec -T nginx-proxy nginx -t >/dev/null 2>&1; then
+    docker compose --env-file "${ENV_FILE}" exec -T nginx-proxy nginx -s reload >/dev/null 2>&1 || true
+  fi
+}
+
 ./scripts/render-configs.sh http
 docker compose --env-file "${ENV_FILE}" up -d
 
@@ -58,14 +71,18 @@ for domain_name in "${domains[@]}"; do
   certbot_args+=(-d "${domain_name}")
 done
 
-docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot certonly \
+if ! docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot certonly \
   --webroot -w /usr/share/nginx/html \
   --agree-tos \
   --email "${LETSENCRYPT_EMAIL}" \
   --non-interactive \
   --cert-name "${TLS_CERT_NAME}" \
   --expand \
-  "${certbot_args[@]}"
+  "${certbot_args[@]}"; then
+  restore_previous_mode
+  echo "Certificate request failed; restored previous proxy mode: ${PREVIOUS_MODE}" >&2
+  exit 1
+fi
 
 ./scripts/render-configs.sh https
 docker compose --env-file "${ENV_FILE}" exec nginx-proxy nginx -t
