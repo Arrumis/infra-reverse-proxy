@@ -112,7 +112,6 @@ emit_standard_host() {
 
 emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
 emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
-emit_standard_host "munin" "${MUNIN_HOST}" "http://${MUNIN_UPSTREAM}/munin/"
 emit_standard_host "tategaki" "${TATEGAKI_HOST}" "http://${TATEGAKI_UPSTREAM}"
 emit_standard_host "syncthing" "${SYNCTHING_HOST}" "http://${SYNCTHING_UPSTREAM}"
 emit_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}"
@@ -131,6 +130,20 @@ emit_tls_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-client" 10
 emit_service_url "openvpn-client" "https://${OPENVPN_CLIENT_UPSTREAM}" "insecure-skip-verify"
 
 emit_redirect_router "traefik" "Host(\`${TRAEFIK_HOST}\`)" "api@internal" 100
+emit_redirect_router "munin" "Host(\`${MUNIN_HOST}\`)" "munin" 100
+cat >>"${routers_tmp}" <<EOF
+    munin-https:
+      entryPoints:
+        - websecure
+      rule: "Host(\`${MUNIN_HOST}\`)"
+      priority: 100
+      middlewares:
+        - munin-prefix
+      service: munin
+      tls:
+        certResolver: letsencrypt
+EOF
+emit_service_url "munin" "http://${MUNIN_UPSTREAM}"
 cat >>"${routers_tmp}" <<EOF
     traefik-root-https:
       entryPoints:
@@ -198,6 +211,9 @@ http:
         regex: "^https?://([^/]+)/?$"
         replacement: "https://\$\${1}/dashboard/"
         permanent: true
+    munin-prefix:
+      addPrefix:
+        prefix: /munin
 
   serversTransports:
     insecure-skip-verify:
