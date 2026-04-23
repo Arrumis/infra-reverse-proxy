@@ -10,7 +10,11 @@ cp .env.example .env.local
 docker compose --env-file .env.local up -d
 ```
 
-初回は external network が必要です。
+現在の推奨は `nginx-proxy` を host network で動かす構成です。
+MyIP / PPP 系の公開IPと Docker のポート公開を組み合わせると返り道が不安定になりやすいため、
+外部公開は host 側で `80/443` を受け、各アプリへは `127.0.0.1:<port>` で流します。
+
+初回は app 側の compose が参加する external network が必要です。
 
 ```bash
 ./scripts/create-network.sh
@@ -52,4 +56,3 @@ docker compose --env-file .env.local up -d
 
 - アプリ repo を proxy network に参加させる override は別途追加する想定です
 - Let’s Encrypt の取得フローはまだ旧 `proxy.sh` 相当を完全には移していません
-
