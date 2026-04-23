@@ -1,0 +1,17 @@
+.env
+.env.local
+.DS_Store
+data/*
+!data/.gitkeep
+!data/conf.d/
+!data/conf.d/.gitkeep
+!data/html/
+!data/html/.gitkeep
+!data/letsencrypt/
+!data/letsencrypt/.gitkeep
+!data/log/
+!data/log/.gitkeep
+!data/log_letsencrypt/
+!data/log_letsencrypt/.gitkeep
+.htpasswd
+
