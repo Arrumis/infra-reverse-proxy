@@ -13,6 +13,10 @@ DOMAIN="${DOMAIN:-example.local}"
 ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
 MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
+TATEGAKI_HOST="${TATEGAKI_HOST:-tategaki.${DOMAIN}}"
+SYNCTHING_HOST="${SYNCTHING_HOST:-syncthing.${DOMAIN}}"
+OPENVPN_HOST="${OPENVPN_HOST:-openvpn.${DOMAIN}}"
+EPGSTATION_HOST="${EPGSTATION_HOST:-epgstation.${DOMAIN}}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 
@@ -28,7 +32,11 @@ docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot ce
   --expand \
   -d "${ROOT_HOST}" \
   -d "${TTRSS_HOST}" \
-  -d "${MUNIN_HOST}"
+  -d "${MUNIN_HOST}" \
+  -d "${TATEGAKI_HOST}" \
+  -d "${SYNCTHING_HOST}" \
+  -d "${OPENVPN_HOST}" \
+  -d "${EPGSTATION_HOST}"
 
 ./scripts/render-configs.sh https
 docker compose --env-file "${ENV_FILE}" exec nginx-proxy nginx -t
