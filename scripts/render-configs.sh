@@ -23,7 +23,9 @@ MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
 TATEGAKI_HOST="${TATEGAKI_HOST:-tategaki.${DOMAIN}}"
 SYNCTHING_HOST="${SYNCTHING_HOST:-syncthing.${DOMAIN}}"
 OPENVPN_HOST="${OPENVPN_HOST:-openvpn.${DOMAIN}}"
-EPGSTATION_HOST="${EPGSTATION_HOST:-epgstation.${DOMAIN}}"
+EPGREC_HOST="${EPGREC_HOST:-epgrec.${DOMAIN}}"
+EPGSTATION_HOST="${EPGSTATION_HOST:-${EPGREC_HOST}}"
+MIRAKURUN_HOST="${MIRAKURUN_HOST:-mirakurun.${DOMAIN}}"
 WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM:-127.0.0.1:8080}"
 TTRSS_UPSTREAM="${TTRSS_UPSTREAM:-127.0.0.1:8280}"
 MUNIN_UPSTREAM="${MUNIN_UPSTREAM:-127.0.0.1:8081}"
@@ -31,6 +33,7 @@ TATEGAKI_UPSTREAM="${TATEGAKI_UPSTREAM:-127.0.0.1:3000}"
 SYNCTHING_UPSTREAM="${SYNCTHING_UPSTREAM:-127.0.0.1:8384}"
 OPENVPN_ADMIN_UPSTREAM="${OPENVPN_ADMIN_UPSTREAM:-127.0.0.1:943}"
 OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM:-127.0.0.1:9443}"
+MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM:-127.0.0.1:40772}"
 EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM:-127.0.0.1:8888}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 
@@ -43,6 +46,7 @@ rm -f \
   data/conf.d/tategaki-http.conf \
   data/conf.d/syncthing-http.conf \
   data/conf.d/openvpn-http.conf \
+  data/conf.d/mirakurun-http.conf \
   data/conf.d/epgstation-http.conf \
   data/conf.d/wordpress-https.conf \
   data/conf.d/ttrss-https.conf \
@@ -50,6 +54,7 @@ rm -f \
   data/conf.d/tategaki-https.conf \
   data/conf.d/syncthing-https.conf \
   data/conf.d/openvpn-https.conf \
+  data/conf.d/mirakurun-https.conf \
   data/conf.d/epgstation-https.conf
 cp templates/logformat.conf data/conf.d/logformat.conf
 
@@ -61,7 +66,8 @@ case "${MODE}" in
     envsubst '${TATEGAKI_HOST} ${TATEGAKI_UPSTREAM}' < templates/tategaki_http.conf > data/conf.d/tategaki-http.conf
     envsubst '${SYNCTHING_HOST} ${SYNCTHING_UPSTREAM}' < templates/syncthing_http.conf > data/conf.d/syncthing-http.conf
     envsubst '${OPENVPN_HOST} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_http.conf > data/conf.d/openvpn-http.conf
-    envsubst '${EPGSTATION_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgstation-http.conf
+    envsubst '${MIRAKURUN_HOST} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_http.conf > data/conf.d/mirakurun-http.conf
+    envsubst '${EPGREC_HOST} ${EPGSTATION_UPSTREAM}' < templates/epgstation_http.conf > data/conf.d/epgstation-http.conf
     ;;
   https)
     envsubst '${ROOT_HOST}' < templates/wordpress_http_redirect.conf > data/conf.d/default.conf
@@ -70,7 +76,8 @@ case "${MODE}" in
     envsubst '${TATEGAKI_HOST}' < templates/tategaki_http_redirect.conf > data/conf.d/tategaki-http.conf
     envsubst '${SYNCTHING_HOST}' < templates/syncthing_http_redirect.conf > data/conf.d/syncthing-http.conf
     envsubst '${OPENVPN_HOST}' < templates/openvpn_http_redirect.conf > data/conf.d/openvpn-http.conf
-    envsubst '${EPGSTATION_HOST}' < templates/epgstation_http_redirect.conf > data/conf.d/epgstation-http.conf
+    envsubst '${MIRAKURUN_HOST}' < templates/mirakurun_http_redirect.conf > data/conf.d/mirakurun-http.conf
+    envsubst '${EPGREC_HOST}' < templates/epgstation_http_redirect.conf > data/conf.d/epgstation-http.conf
     DOMAIN="${DOMAIN}" ROOT_HOST="${ROOT_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" WORDPRESS_UPSTREAM="${WORDPRESS_UPSTREAM}" \
       envsubst '${DOMAIN} ${ROOT_HOST} ${TLS_CERT_NAME} ${WORDPRESS_UPSTREAM}' < templates/wordpress_proxy.conf > data/conf.d/wordpress-https.conf
     DOMAIN="${DOMAIN}" TTRSS_HOST="${TTRSS_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" TTRSS_UPSTREAM="${TTRSS_UPSTREAM}" \
@@ -83,8 +90,10 @@ case "${MODE}" in
       envsubst '${DOMAIN} ${SYNCTHING_HOST} ${TLS_CERT_NAME} ${SYNCTHING_UPSTREAM}' < templates/syncthing_proxy.conf > data/conf.d/syncthing-https.conf
     DOMAIN="${DOMAIN}" OPENVPN_HOST="${OPENVPN_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" OPENVPN_ADMIN_UPSTREAM="${OPENVPN_ADMIN_UPSTREAM}" OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM}" \
       envsubst '${DOMAIN} ${OPENVPN_HOST} ${TLS_CERT_NAME} ${OPENVPN_ADMIN_UPSTREAM} ${OPENVPN_CLIENT_UPSTREAM}' < templates/openvpn_proxy.conf > data/conf.d/openvpn-https.conf
-    DOMAIN="${DOMAIN}" EPGSTATION_HOST="${EPGSTATION_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
-      envsubst '${DOMAIN} ${EPGSTATION_HOST} ${TLS_CERT_NAME} ${EPGSTATION_UPSTREAM}' < templates/epgstation_proxy.conf > data/conf.d/epgstation-https.conf
+    DOMAIN="${DOMAIN}" MIRAKURUN_HOST="${MIRAKURUN_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM}" \
+      envsubst '${DOMAIN} ${MIRAKURUN_HOST} ${TLS_CERT_NAME} ${MIRAKURUN_UPSTREAM}' < templates/mirakurun_proxy.conf > data/conf.d/mirakurun-https.conf
+    DOMAIN="${DOMAIN}" EPGREC_HOST="${EPGREC_HOST}" TLS_CERT_NAME="${TLS_CERT_NAME}" EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM}" \
+      envsubst '${DOMAIN} ${EPGREC_HOST} ${TLS_CERT_NAME} ${EPGSTATION_UPSTREAM}' < templates/epgstation_proxy.conf > data/conf.d/epgstation-https.conf
     ;;
   *)
     echo "Usage: $0 [http|https]"
