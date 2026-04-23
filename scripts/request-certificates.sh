@@ -24,7 +24,7 @@ LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
 TLS_CERT_NAME="${TLS_CERT_NAME:-${ROOT_HOST}}"
 PREVIOUS_MODE="http"
 
-if [[ -f "data/letsencrypt/renewal/${TLS_CERT_NAME}.conf" ]] || [[ -f "data/letsencrypt/live/${TLS_CERT_NAME}/fullchain.pem" ]]; then
+if compgen -G "data/letsencrypt/renewal/*.conf" >/dev/null || compgen -G "data/letsencrypt/live/*/fullchain.pem" >/dev/null; then
   PREVIOUS_MODE="https"
 fi
 
@@ -66,21 +66,27 @@ restore_previous_mode() {
 ./scripts/render-configs.sh http
 docker compose --env-file "${ENV_FILE}" up -d
 
-certbot_args=()
+success_count=0
+failed_domains=()
+
 for domain_name in "${domains[@]}"; do
-  certbot_args+=(-d "${domain_name}")
+  if docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot certonly \
+    --webroot -w /usr/share/nginx/html \
+    --agree-tos \
+    --email "${LETSENCRYPT_EMAIL}" \
+    --non-interactive \
+    --cert-name "${domain_name}" \
+    -d "${domain_name}"; then
+    success_count=$((success_count + 1))
+    continue
+  fi
+
+  failed_domains+=("${domain_name}")
 done
 
-if ! docker compose --env-file "${ENV_FILE}" run --rm --entrypoint certbot certbot certonly \
-  --webroot -w /usr/share/nginx/html \
-  --agree-tos \
-  --email "${LETSENCRYPT_EMAIL}" \
-  --non-interactive \
-  --cert-name "${TLS_CERT_NAME}" \
-  --expand \
-  "${certbot_args[@]}"; then
+if [[ "${success_count}" -eq 0 ]] && [[ "${PREVIOUS_MODE}" == "http" ]]; then
   restore_previous_mode
-  echo "Certificate request failed; restored previous proxy mode: ${PREVIOUS_MODE}" >&2
+  echo "Certificate request failed for all hosts; restored previous proxy mode: ${PREVIOUS_MODE}" >&2
   exit 1
 fi
 
@@ -88,4 +94,8 @@ fi
 docker compose --env-file "${ENV_FILE}" exec nginx-proxy nginx -t
 docker compose --env-file "${ENV_FILE}" exec nginx-proxy nginx -s reload
 
-echo "Certificates issued and HTTPS configs enabled."
+if [[ "${#failed_domains[@]}" -gt 0 ]]; then
+  printf 'Certificates failed for:%s\n' " ${failed_domains[*]}" >&2
+fi
+
+echo "Certificates processed and HTTPS configs enabled."

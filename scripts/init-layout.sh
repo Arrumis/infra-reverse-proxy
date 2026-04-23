@@ -19,9 +19,9 @@ mkdir -p data/conf.d data/html data/letsencrypt data/log data/log_letsencrypt te
 cp templates/nginx.conf nginx.conf
 touch .htpasswd
 
-if [[ -f "${RENEWAL_CONF}" || ( -f "${CERT_DIR}/fullchain.pem" && -f "${CERT_DIR}/privkey.pem" ) ]]; then
+if compgen -G "data/letsencrypt/renewal/*.conf" >/dev/null || compgen -G "data/letsencrypt/live/*/fullchain.pem" >/dev/null; then
   ./scripts/render-configs.sh https
-  echo "Initialized reverse proxy layout with existing HTTPS certificate: ${TLS_CERT_NAME}"
+  echo "Initialized reverse proxy layout with existing HTTPS certificates."
 else
   ./scripts/render-configs.sh http
   echo "Initialized reverse proxy layout in HTTP mode."
