@@ -32,6 +32,7 @@ EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM:-127.0.0.1:8888}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
+TRAEFIK_INTERNAL_PORT="${TRAEFIK_INTERNAL_PORT:-8088}"
 TRAEFIK_LOG_LEVEL="${TRAEFIK_LOG_LEVEL:-INFO}"
 
 mkdir -p data/traefik/dynamic data/letsencrypt data/log
@@ -166,6 +167,8 @@ entryPoints:
     address: :${HTTP_PORT}
   websecure:
     address: :${HTTPS_PORT}
+  traefik:
+    address: 127.0.0.1:${TRAEFIK_INTERNAL_PORT}
 
 providers:
   file:
