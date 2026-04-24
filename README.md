@@ -3,6 +3,10 @@
 `Traefik v2.11` を使う共通 reverse proxy 基盤です。  
 各アプリは `127.0.0.1:<port>` を upstream にし、公開側の `80/443` は Traefik が host network で受けます。
 
+## 日本語メモ
+
+GitHub のコミット一覧が英語で分かりにくい場合は、[コミット履歴の日本語メモ](docs/COMMIT_HISTORY_JA.md) を見てください。
+
 ## 起動
 
 ```bash
