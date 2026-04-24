@@ -10,6 +10,8 @@ data/conf.d/*.conf
 !data/html/.gitkeep
 !data/letsencrypt/
 !data/letsencrypt/.gitkeep
+data/letsencrypt/*
+!data/letsencrypt/.gitkeep
 !data/log/
 !data/log/.gitkeep
 data/log/*.log
