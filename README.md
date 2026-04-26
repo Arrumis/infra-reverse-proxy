@@ -7,6 +7,28 @@
 
 GitHub のコミット一覧が英語で分かりにくい場合は、[コミット履歴の日本語メモ](docs/COMMIT_HISTORY_JA.md) を見てください。
 
+## サンプル値の置き換え
+
+`.env.example` は公開用の見本です。実際に使う値は `.env.local` に書きます。
+
+- `DOMAIN` / `ROOT_HOST` は実際に公開するドメインへ変更します
+- `TTRSS_HOST` や `MUNIN_HOST` などは、使うサブドメインへ変更します
+- `LETSENCRYPT_EMAIL` は証明書通知を受け取れるメールへ変更します
+- `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` は管理画面用の強い認証情報へ変更します
+- `WORDPRESS_UPSTREAM` などは各アプリのローカル公開ポートと一致させます
+- 親 repo からまとめて使う場合は、`stack.service.env.local` の `GLOBAL__DOMAIN` や `GLOBAL__BASIC_AUTH_*` を使います
+
+例:
+
+```env
+DOMAIN=ponkotu.mydns.jp
+ROOT_HOST=ponkotu.mydns.jp
+TTRSS_HOST=ttrss.ponkotu.mydns.jp
+LETSENCRYPT_EMAIL=admin@ponkotu.mydns.jp
+BASIC_AUTH_USER=admin
+BASIC_AUTH_PASSWORD=自分で決めた強いパスワード
+```
+
 ## 起動
 
 ```bash
