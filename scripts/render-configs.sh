@@ -225,7 +225,7 @@ http:
     traefik-dashboard-root:
       redirectRegex:
         regex: "^https?://([^/]+)/?$"
-        replacement: "https://\$\${1}/dashboard/"
+        replacement: "https://\${1}/dashboard/"
         permanent: true
     munin-prefix:
       addPrefix:
