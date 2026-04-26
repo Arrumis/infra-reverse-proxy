@@ -135,9 +135,8 @@ emit_redirect_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`
 emit_tls_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`/admin\`)" "openvpn-admin" 200
 emit_service_url "openvpn-admin" "https://${OPENVPN_ADMIN_UPSTREAM}" "insecure-skip-verify"
 
-emit_redirect_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-client" 100
-emit_tls_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-client" 100
-emit_service_url "openvpn-client" "https://${OPENVPN_CLIENT_UPSTREAM}" "insecure-skip-verify"
+emit_redirect_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-admin" 100
+emit_tls_router "openvpn-client" "Host(\`${OPENVPN_HOST}\`)" "openvpn-admin" 100
 
 emit_redirect_router "traefik" "Host(\`${TRAEFIK_HOST}\`)" "api@internal" 100
 emit_redirect_router "munin" "Host(\`${MUNIN_HOST}\`)" "munin" 100
