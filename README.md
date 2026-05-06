@@ -1,37 +1,9 @@
 # infra-reverse-proxy
 
-`Traefik v2.11` を使う共通 reverse proxy 基盤です。
-各アプリは `127.0.0.1:<port>` を upstream にし、公開側の `80/443` は Traefik が host network で受けます。
+公開入口をまとめるリバースプロキシ用リポジトリです。
+Traefik を使い、外部から来た通信を各 Docker サービスのローカル公開ポートへ振り分けます。
 
-## 日本語メモ
-
-GitHub のコミット一覧が英語で分かりにくい場合は、[コミット履歴の日本語メモ](docs/COMMIT_HISTORY_JA.md) を見てください。
-
-## サンプル値の置き換え
-
-`.env.example` は公開用の見本です。実際に使う値は `.env.local` に書きます。
-
-- `DOMAIN` / `ROOT_HOST` は実際に公開するドメインへ変更します
-- `TTRSS_HOST` や `MUNIN_HOST` などは、使うサブドメインへ変更します
-- `LETSENCRYPT_EMAIL` は証明書通知を受け取れるメールへ変更します
-- `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` は管理画面用の強い認証情報へ変更します
-- `BASIC_AUTH_EXEMPT_SOURCE_RANGES` は Basic 認証を省略してよい送信元IP範囲です
-- `WORDPRESS_UPSTREAM` などは各アプリのローカル公開ポートと一致させます
-- 親 repo からまとめて使う場合は、`stack.service.env.local` の `GLOBAL__DOMAIN` や `GLOBAL__BASIC_AUTH_*` を使います
-
-例:
-
-```env
-DOMAIN=ponkotu.mydns.jp
-ROOT_HOST=ponkotu.mydns.jp
-TTRSS_HOST=ttrss.ponkotu.mydns.jp
-LETSENCRYPT_EMAIL=admin@ponkotu.mydns.jp
-BASIC_AUTH_USER=admin
-BASIC_AUTH_PASSWORD=自分で決めた強いパスワード
-BASIC_AUTH_EXEMPT_SOURCE_RANGES=127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48
-```
-
-## 起動
+## 使い方
 
 ```bash
 cp .env.example .env.local
@@ -39,90 +11,63 @@ cp .env.example .env.local
 docker compose --env-file .env.local up -d
 ```
 
-## 方式
-
-- Proxy: `Traefik v2.11`
-- 証明書: Let's Encrypt `HTTP-01`
-- 設定供給: `file provider`
-- 公開ポート: host 側の `80/443`
-
-Traefik の dashboard/API は secure mode で使い、`traefik.<domain>` から通常の router として公開します。
-
-録画系と管理系の入口には Basic 認証をかけます。
-
-- `munin.<domain>`
-- `mirakurun.<domain>`
-- `epgrec.<domain>`
-- `epgstation.<domain>`
-- `traefik.<domain>`
-
-ただし `BASIC_AUTH_EXEMPT_SOURCE_RANGES` に含まれる送信元IPは Basic 認証を省略します。
-既定では `127.0.0.1/32`、`::1/128`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`100.64.0.0/10`、`fd7a:115c:a1e0::/48` を許可します。
-`192.168.x.x` のローカルLANと、Tailscale の `100.x.x.x` はこの既定値に含まれます。
-
-## データ配置
-
-- `data/traefik/traefik.yml`
-- `data/traefik/dynamic/routes.yml`
-- `data/letsencrypt/acme.json`
-- `data/log/`
-
-`acme.json` は Traefik の ACME 保存先なので、`600` 権限で管理します。
-
-## 初期化
-
-```bash
-./scripts/init-layout.sh
-```
-
-このスクリプトは次を行います。
-
-- `data/` 配下の必要ディレクトリを作成
-- `acme.json` を作成して権限を整える
-- `.htpasswd` を生成して権限を整える
-- Traefik の static / dynamic 設定を書き出す
-
-Basic 認証の資格情報は `.env.local` の以下を使います。
-
-- `BASIC_AUTH_USER`
-- `BASIC_AUTH_PASSWORD`
-- `BASIC_AUTH_EXEMPT_SOURCE_RANGES`
-
-## HTTPS 化
-
-外部から `80/tcp` と `443/tcp` に到達できる前提で、Traefik 自身の ACME 取得を誘発します。
+証明書を取得できる公開条件がそろっている場合:
 
 ```bash
 ./scripts/request-certificates.sh
 ```
 
-このスクリプトは次を行います。
+## 変更する値
 
-- Traefik 設定を再生成
-- Traefik を起動
-- 各公開ホストへローカルから HTTPS アクセスして ACME 発行を誘発
+`.env.example` は公開用の見本です。実際の値は `.env.local` に書きます。
 
-`traefik.<domain>` は dashboard 用の補助ホストなので、ここだけ失敗しても他サービスの HTTPS 化は継続します。
+- `DOMAIN`: 公開する親ドメインです。
+- `ROOT_HOST`: WordPress など、親ドメイン直下で出すホスト名です。
+- `TTRSS_HOST` など: 各サービスの公開ホスト名です。
+- `LETSENCRYPT_EMAIL`: 証明書通知を受け取るメールアドレスです。
+- `BASIC_AUTH_USER` と `BASIC_AUTH_PASSWORD`: 管理系画面の認証情報です。
+- `BASIC_AUTH_EXEMPT_SOURCE_RANGES`: Basic 認証を省略してよい送信元 IP 範囲です。
+- `WORDPRESS_UPSTREAM` など: 各サービスの転送先です。
+- `INFRA_REVERSE_PROXY__...`: 親リポジトリからまとめて設定するときに使います。
 
-## ホスト名
+## 公開するもの
 
-`.env.local` の以下を使います。
+通常公開:
 
-- `ROOT_HOST`
-- `TTRSS_HOST`
-- `MUNIN_HOST`
-- `TATEGAKI_HOST`
-- `SYNCTHING_HOST`
-- `OPENVPN_HOST`
-- `TRAEFIK_HOST`
-- `MIRAKURUN_HOST`
-- `EPGREC_HOST`
-- `EPGSTATION_HOST`
+- WordPress
+- Tiny Tiny RSS
+- tategaki
+- Syncthing
+- OpenVPN
 
-録画 UI は `epgrec.<domain>` を旧構成互換の正面入口にしつつ、`epgstation.<domain>` も同じ UI へ流します。
+Basic 認証で保護する管理系:
+
+- Munin
+- Mirakurun
+- epgrec
+- EPGStation
+- Traefik 管理画面
+
+`BASIC_AUTH_EXEMPT_SOURCE_RANGES` には、既定でローカルアドレス、家庭内ネットワーク、Tailscale の IPv4 と IPv6 を入れています。
+
+## データ
+
+GitHub に上げるもの:
+
+- `compose.yaml`
+- `.env.example`
+- `scripts/`
+- `templates/`
+- `README.md`
+
+GitHub に上げないもの:
+
+- `.env.local`
+- `data/letsencrypt/acme.json`
+- `data/log/`
+- 生成済み設定ファイル
 
 ## 補足
 
-- 公開経路そのものはこの repo の責務ではありません
-- `myip`、固定IP、ルータ転送などの回線固有設定は別管理です
-- 初回導入は `docker-stack-installer` から呼ぶ前提です
+- 公開回線、固定 IP、ルーター転送、ダイナミック DNS はこのリポジトリの担当外です。
+- 初回導入は `docker-stack-installer` から呼び出す前提です。

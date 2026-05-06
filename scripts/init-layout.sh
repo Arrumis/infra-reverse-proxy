@@ -31,4 +31,4 @@ else
 fi
 
 ./scripts/render-configs.sh
-echo "Initialized Traefik reverse proxy layout."
+echo "Traefik リバースプロキシの配置を初期化しました。"
