@@ -34,6 +34,7 @@ HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
 TRAEFIK_INTERNAL_PORT="${TRAEFIK_INTERNAL_PORT:-8088}"
 TRAEFIK_LOG_LEVEL="${TRAEFIK_LOG_LEVEL:-INFO}"
+BASIC_AUTH_EXEMPT_SOURCE_RANGES="${BASIC_AUTH_EXEMPT_SOURCE_RANGES:-127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48}"
 
 mkdir -p data/traefik/dynamic data/letsencrypt data/log
 
@@ -88,6 +89,26 @@ EOF
 EOF
 }
 
+build_client_ip_rule() {
+  local range
+  local rule=""
+  local old_ifs="${IFS}"
+
+  # カンマ区切り・空白区切りのどちらでも書けるようにする。
+  IFS=', '
+  for range in ${BASIC_AUTH_EXEMPT_SOURCE_RANGES}; do
+    [[ -n "${range}" ]] || continue
+    if [[ -z "${rule}" ]]; then
+      rule="ClientIP(\`${range}\`)"
+    else
+      rule="${rule} || ClientIP(\`${range}\`)"
+    fi
+  done
+  IFS="${old_ifs}"
+
+  printf '%s' "${rule}"
+}
+
 emit_service_url() {
   local name="$1"
   local url="$2"
@@ -120,15 +141,43 @@ emit_standard_host() {
   emit_service_url "${name}" "${url}" "${transport}"
 }
 
+emit_basic_auth_exempt_host() {
+  local name="$1"
+  local host="$2"
+  local service="$3"
+  local middlewares="${4:-}"
+  local client_ip_rule
+
+  client_ip_rule="$(build_client_ip_rule)"
+  [[ -n "${client_ip_rule}" ]] || return 0
+
+  emit_tls_router \
+    "${name}-basic-auth-exempt" \
+    "Host(\`${host}\`) && (${client_ip_rule})" \
+    "${service}" \
+    300 \
+    "${middlewares}"
+}
+
+emit_protected_standard_host() {
+  local name="$1"
+  local host="$2"
+  local url="$3"
+  local transport="${4:-}"
+
+  emit_standard_host "${name}" "${host}" "${url}" "${transport}" $'        - protected-basic-auth'
+  emit_basic_auth_exempt_host "${name}" "${host}" "${name}"
+}
+
 emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
 emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
 emit_standard_host "tategaki" "${TATEGAKI_HOST}" "http://${TATEGAKI_UPSTREAM}"
 emit_standard_host "syncthing" "${SYNCTHING_HOST}" "http://${SYNCTHING_UPSTREAM}"
-emit_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}" "" $'        - protected-basic-auth'
-emit_standard_host "epgrec" "${EPGREC_HOST}" "http://${EPGSTATION_UPSTREAM}" "" $'        - protected-basic-auth'
+emit_protected_standard_host "mirakurun" "${MIRAKURUN_HOST}" "http://${MIRAKURUN_UPSTREAM}"
+emit_protected_standard_host "epgrec" "${EPGREC_HOST}" "http://${EPGSTATION_UPSTREAM}"
 
 if [[ "${EPGSTATION_HOST}" != "${EPGREC_HOST}" ]]; then
-  emit_standard_host "epgstation" "${EPGSTATION_HOST}" "http://${EPGSTATION_UPSTREAM}" "" $'        - protected-basic-auth'
+  emit_protected_standard_host "epgstation" "${EPGSTATION_HOST}" "http://${EPGSTATION_UPSTREAM}"
 fi
 
 emit_redirect_router "openvpn-admin" "Host(\`${OPENVPN_HOST}\`) && PathPrefix(\`/admin\`)" "openvpn-admin" 200
@@ -154,6 +203,7 @@ cat >>"${routers_tmp}" <<EOF
         certResolver: letsencrypt
 EOF
 emit_service_url "munin" "http://${MUNIN_UPSTREAM}"
+emit_basic_auth_exempt_host "munin" "${MUNIN_HOST}" "munin" $'        - munin-prefix'
 cat >>"${routers_tmp}" <<EOF
     traefik-root-https:
       entryPoints:
@@ -177,6 +227,30 @@ cat >>"${routers_tmp}" <<EOF
       tls:
         certResolver: letsencrypt
 EOF
+
+traefik_client_ip_rule="$(build_client_ip_rule)"
+if [[ -n "${traefik_client_ip_rule}" ]]; then
+  cat >>"${routers_tmp}" <<EOF
+    traefik-root-basic-auth-exempt-https:
+      entryPoints:
+        - websecure
+      rule: "Host(\`${TRAEFIK_HOST}\`) && Path(\`/\`) && (${traefik_client_ip_rule})"
+      middlewares:
+        - traefik-dashboard-root
+      priority: 300
+      service: api@internal
+      tls:
+        certResolver: letsencrypt
+    traefik-dashboard-basic-auth-exempt-https:
+      entryPoints:
+        - websecure
+      rule: "Host(\`${TRAEFIK_HOST}\`) && (PathPrefix(\`/api\`) || PathPrefix(\`/dashboard\`)) && (${traefik_client_ip_rule})"
+      priority: 300
+      service: api@internal
+      tls:
+        certResolver: letsencrypt
+EOF
+fi
 
 cat >"${static_config}" <<EOF
 api:

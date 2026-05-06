@@ -1,6 +1,6 @@
 # infra-reverse-proxy
 
-`Traefik v2.11` を使う共通 reverse proxy 基盤です。  
+`Traefik v2.11` を使う共通 reverse proxy 基盤です。
 各アプリは `127.0.0.1:<port>` を upstream にし、公開側の `80/443` は Traefik が host network で受けます。
 
 ## 日本語メモ
@@ -15,6 +15,7 @@ GitHub のコミット一覧が英語で分かりにくい場合は、[コミッ
 - `TTRSS_HOST` や `MUNIN_HOST` などは、使うサブドメインへ変更します
 - `LETSENCRYPT_EMAIL` は証明書通知を受け取れるメールへ変更します
 - `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` は管理画面用の強い認証情報へ変更します
+- `BASIC_AUTH_EXEMPT_SOURCE_RANGES` は Basic 認証を省略してよい送信元IP範囲です
 - `WORDPRESS_UPSTREAM` などは各アプリのローカル公開ポートと一致させます
 - 親 repo からまとめて使う場合は、`stack.service.env.local` の `GLOBAL__DOMAIN` や `GLOBAL__BASIC_AUTH_*` を使います
 
@@ -27,6 +28,7 @@ TTRSS_HOST=ttrss.ponkotu.mydns.jp
 LETSENCRYPT_EMAIL=admin@ponkotu.mydns.jp
 BASIC_AUTH_USER=admin
 BASIC_AUTH_PASSWORD=自分で決めた強いパスワード
+BASIC_AUTH_EXEMPT_SOURCE_RANGES=127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48
 ```
 
 ## 起動
@@ -54,6 +56,10 @@ Traefik の dashboard/API は secure mode で使い、`traefik.<domain>` から�
 - `epgstation.<domain>`
 - `traefik.<domain>`
 
+ただし `BASIC_AUTH_EXEMPT_SOURCE_RANGES` に含まれる送信元IPは Basic 認証を省略します。
+既定では `127.0.0.1/32`、`::1/128`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`100.64.0.0/10`、`fd7a:115c:a1e0::/48` を許可します。
+`192.168.x.x` のローカルLANと、Tailscale の `100.x.x.x` はこの既定値に含まれます。
+
 ## データ配置
 
 - `data/traefik/traefik.yml`
@@ -80,6 +86,7 @@ Basic 認証の資格情報は `.env.local` の以下を使います。
 
 - `BASIC_AUTH_USER`
 - `BASIC_AUTH_PASSWORD`
+- `BASIC_AUTH_EXEMPT_SOURCE_RANGES`
 
 ## HTTPS 化
 
