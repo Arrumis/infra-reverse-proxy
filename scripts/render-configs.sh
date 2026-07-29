@@ -11,6 +11,8 @@ fi
 
 DOMAIN="${DOMAIN:-example.local}"
 ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
+WWW_HOST="${WWW_HOST:-www.${DOMAIN}}"
+WWW_HOST_REGEX="${WWW_HOST//./\\\\.}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
 MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
 TATEGAKI_HOST="${TATEGAKI_HOST:-tategaki.${DOMAIN}}"
@@ -33,6 +35,7 @@ LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
 TRAEFIK_INTERNAL_PORT="${TRAEFIK_INTERNAL_PORT:-8088}"
+TUNNEL_INTERNAL_PORT="${TUNNEL_INTERNAL_PORT:-8089}"
 TRAEFIK_LOG_LEVEL="${TRAEFIK_LOG_LEVEL:-INFO}"
 BASIC_AUTH_EXEMPT_SOURCE_RANGES="${BASIC_AUTH_EXEMPT_SOURCE_RANGES:-127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48}"
 
@@ -86,6 +89,31 @@ EOF
       service: ${service}
       tls:
         certResolver: letsencrypt
+EOF
+}
+
+emit_tunnel_router() {
+  local name="$1"
+  local rule="$2"
+  local service="$3"
+  local priority="${4:-200}"
+  local middlewares="${5:-}"
+
+  cat >>"${routers_tmp}" <<EOF
+    ${name}-tunnel:
+      entryPoints:
+        - tunnel
+      rule: "${rule}"
+EOF
+  if [[ -n "${middlewares}" ]]; then
+    cat >>"${routers_tmp}" <<EOF
+      middlewares:
+${middlewares}
+EOF
+  fi
+  cat >>"${routers_tmp}" <<EOF
+      priority: ${priority}
+      service: ${service}
 EOF
 }
 
@@ -168,6 +196,15 @@ emit_protected_standard_host() {
   emit_standard_host "${name}" "${host}" "${url}" "${transport}" $'        - protected-basic-auth'
   emit_basic_auth_exempt_host "${name}" "${host}" "${name}"
 }
+
+emit_tunnel_router "wordpress" "Host(\`${ROOT_HOST}\`)" "wordpress"
+emit_tunnel_router "tategaki" "Host(\`${TATEGAKI_HOST}\`)" "tategaki"
+emit_tunnel_router \
+  "wordpress-www" \
+  "Host(\`${WWW_HOST}\`)" \
+  "wordpress" \
+  200 \
+  $'        - www-to-apex'
 
 emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
 emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
@@ -267,6 +304,12 @@ entryPoints:
     address: :${HTTP_PORT}
   websecure:
     address: :${HTTPS_PORT}
+  tunnel:
+    address: 127.0.0.1:${TUNNEL_INTERNAL_PORT}
+    forwardedHeaders:
+      trustedIPs:
+        - 127.0.0.1/32
+        - ::1/128
   traefik:
     address: 127.0.0.1:${TRAEFIK_INTERNAL_PORT}
 
@@ -300,6 +343,11 @@ http:
       redirectRegex:
         regex: "^https?://([^/]+)/?$"
         replacement: "https://\${1}/dashboard/"
+        permanent: true
+    www-to-apex:
+      redirectRegex:
+        regex: "^https?://${WWW_HOST_REGEX}/(.*)"
+        replacement: "https://${ROOT_HOST}/\${1}"
         permanent: true
     munin-prefix:
       addPrefix:

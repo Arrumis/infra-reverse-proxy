@@ -1,7 +1,7 @@
 # infra-reverse-proxy
 
 公開入口をまとめるリバースプロキシ用リポジトリです。
-Traefik を使い、外部から来た通信を各 Docker サービスのローカル公開ポートへ振り分けます。
+トラエフィックを使い、外部から来た通信を各コンテナサービスの内部公開ポートへ振り分けます。
 
 ## 使い方
 
@@ -22,11 +22,14 @@ docker compose --env-file .env.local up -d
 `.env.example` は公開用の見本です。実際の値は `.env.local` に書きます。
 
 - `DOMAIN`: 公開する親ドメインです。
-- `ROOT_HOST`: WordPress など、親ドメイン直下で出すホスト名です。
+- `ROOT_HOST`: ブログなど、親ドメイン直下で出すホスト名です。
+- `WWW_HOST`: `ROOT_HOST` へ転送する `www` ホスト名です。
+- `TUNNEL_INTERNAL_PORT`: cloudflaredからだけ接続する、このサーバー内部専用の
+  ポートです。
 - `TTRSS_HOST` など: 各サービスの公開ホスト名です。
 - `LETSENCRYPT_EMAIL`: 証明書通知を受け取るメールアドレスです。
 - `BASIC_AUTH_USER` と `BASIC_AUTH_PASSWORD`: 管理系画面の認証情報です。
-- `BASIC_AUTH_EXEMPT_SOURCE_RANGES`: Basic 認証を省略してよい送信元 IP 範囲です。
+- `BASIC_AUTH_EXEMPT_SOURCE_RANGES`: 簡易認証を省略してよい送信元アドレス範囲です。
 - `WORDPRESS_UPSTREAM` など: 各サービスの転送先です。
 - `INFRA_REVERSE_PROXY__...`: 親リポジトリからまとめて設定するときに使います。
 
@@ -34,25 +37,33 @@ docker compose --env-file .env.local up -d
 
 通常公開:
 
-- WordPress
-- Tiny Tiny RSS
-- tategaki
-- Syncthing
-- OpenVPN
+- ブログ
+- 記事購読機能
+- 縦書き小説リーダー
+- ファイル同期機能
+- 遠隔接続サーバー
 
-Basic 認証で保護する管理系:
+簡易認証で保護する管理系:
 
-- Munin
-- Mirakurun
-- epgrec
-- EPGStation
-- Traefik 管理画面
+- サーバー監視画面
+- テレビチューナー管理画面
+- 録画管理画面
+- 番組録画管理画面
+- リバースプロキシ管理画面
 
-`BASIC_AUTH_EXEMPT_SOURCE_RANGES` には、既定でローカルアドレス、家庭内ネットワーク、Tailscale の IPv4 と IPv6 を入れています。
+`BASIC_AUTH_EXEMPT_SOURCE_RANGES`には、既定でローカルアドレス、家庭内ネットワーク、
+テイルスケールのIPv4とIPv6を入れています。
+
+## クラウドフレアトンネル
+
+生成されるトラエフィック設定には、`127.0.0.1:8089`で待ち受けるトンネル専用入口が含まれます。
+この入口ではブログ、縦書き小説リーダー、`www`から親ドメインへの転送だけを扱います。
+転送情報はこのサーバー内部からの接続だけを信頼するため、ブログはクラウドフレア側のHTTPSと
+訪問者IPを正しく認識できます。
 
 ## データ
 
-GitHub に上げるもの:
+公開リポジトリに上げるもの:
 
 - `compose.yaml`
 - `.env.example`
@@ -60,7 +71,7 @@ GitHub に上げるもの:
 - `templates/`
 - `README.md`
 
-GitHub に上げないもの:
+公開リポジトリに上げないもの:
 
 - `.env.local`
 - `data/letsencrypt/acme.json`
@@ -69,5 +80,5 @@ GitHub に上げないもの:
 
 ## 補足
 
-- 公開回線、固定 IP、ルーター転送、ダイナミック DNS はこのリポジトリの担当外です。
+- 公開回線、固定アドレス、ルーター転送、動的な名前解決はこのリポジトリの担当外です。
 - 初回導入は `docker-stack-installer` から呼び出す前提です。
