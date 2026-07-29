@@ -23,6 +23,8 @@ docker compose --env-file .env.local up -d
 
 - `DOMAIN`: 公開する親ドメインです。
 - `ROOT_HOST`: WordPress など、親ドメイン直下で出すホスト名です。
+- `WWW_HOST`: `ROOT_HOST` へ転送する `www` ホスト名です。
+- `TUNNEL_INTERNAL_PORT`: cloudflaredからだけ接続するlocalhostポートです。
 - `TTRSS_HOST` など: 各サービスの公開ホスト名です。
 - `LETSENCRYPT_EMAIL`: 証明書通知を受け取るメールアドレスです。
 - `BASIC_AUTH_USER` と `BASIC_AUTH_PASSWORD`: 管理系画面の認証情報です。
@@ -49,6 +51,13 @@ Basic 認証で保護する管理系:
 - Traefik 管理画面
 
 `BASIC_AUTH_EXEMPT_SOURCE_RANGES` には、既定でローカルアドレス、家庭内ネットワーク、Tailscale の IPv4 と IPv6 を入れています。
+
+## Cloudflare Tunnel
+
+生成されるTraefik設定には、`127.0.0.1:8089`で待ち受けるTunnel専用入口が含まれます。
+この入口ではWordPress、tategaki、wwwから親ドメインへの転送だけを扱います。
+転送ヘッダーはlocalhostからの接続だけを信頼するため、WordPressはCloudflare側のHTTPSと
+訪問者IPを正しく認識できます。
 
 ## データ
 
