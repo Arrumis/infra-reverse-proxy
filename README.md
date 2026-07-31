@@ -24,6 +24,8 @@ docker compose --env-file .env.local up -d
 - `DOMAIN`: 公開する親ドメインです。
 - `ROOT_HOST`: ブログなど、親ドメイン直下で出すホスト名です。
 - `WWW_HOST`: `ROOT_HOST` へ転送する `www` ホスト名です。
+- `LAN_BIND_ADDRESS`: 家庭内から直接接続するIPv4アドレスです。
+  80・443を外部IPv6を含む全通信機器で待ち受けないために使います。
 - `TUNNEL_INTERNAL_PORT`: cloudflaredからだけ接続する、このサーバー内部専用の
   ポートです。
 - `TTRSS_HOST` など: 各サービスの公開ホスト名です。
@@ -61,6 +63,19 @@ docker compose --env-file .env.local up -d
 転送情報はこのサーバー内部からの接続だけを信頼するため、ブログはクラウドフレア側のHTTPSと
 訪問者IPを正しく認識できます。
 
+## 証明書の自動更新
+
+家庭内から直接接続するときのLet’s Encrypt証明書は、Cloudflare DNSを使って
+自動更新します。`ponkotu.org`だけにDNS編集とゾーン読み取りを許可したAPIトークンを、
+次のファイルへ保存します。
+
+```text
+secrets/cloudflare_dns_api_token
+```
+
+このファイルは所有者だけが読める権限にし、公開リポジトリへ保存しません。
+Traefikには読み取り専用の秘密ファイルとして渡します。
+
 ## データ
 
 公開リポジトリに上げるもの:
@@ -74,6 +89,7 @@ docker compose --env-file .env.local up -d
 公開リポジトリに上げないもの:
 
 - `.env.local`
+- `secrets/cloudflare_dns_api_token`
 - `data/letsencrypt/acme.json`
 - `data/log/`
 - 生成済み設定ファイル

@@ -15,6 +15,7 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 DOMAIN="${DOMAIN:-example.local}"
+LAN_BIND_ADDRESS="${LAN_BIND_ADDRESS:-127.0.0.1}"
 ROOT_HOST="${ROOT_HOST:-${DOMAIN}}"
 TTRSS_HOST="${TTRSS_HOST:-ttrss.${DOMAIN}}"
 MUNIN_HOST="${MUNIN_HOST:-munin.${DOMAIN}}"
@@ -56,7 +57,7 @@ trigger_host() {
   local attempt
 
   for attempt in 1 2 3 4 5; do
-    if curl -kfsSI --resolve "${host}:443:127.0.0.1" "https://${host}${path}" >/dev/null 2>&1; then
+    if curl -kfsSI --resolve "${host}:443:${LAN_BIND_ADDRESS}" "https://${host}${path}" >/dev/null 2>&1; then
       return 0
     fi
     sleep 5
@@ -78,12 +79,12 @@ for item in "${checks[@]}"; do
 done
 
 if [[ "${#failures[@]}" -gt 0 ]]; then
-  printf 'Certificate acquisition failed for:%s\n' " ${failures[*]}" >&2
+  printf '証明書の取得確認に失敗しました:%s\n' " ${failures[*]}" >&2
   exit 1
 fi
 
 if [[ "${#soft_failures[@]}" -gt 0 ]]; then
-  printf 'Certificate acquisition warning for:%s\n' " ${soft_failures[*]}" >&2
+  printf '証明書の取得確認で警告がありました:%s\n' " ${soft_failures[*]}" >&2
 fi
 
-echo "Traefik ACME requests completed."
+echo "Traefikの証明書取得確認が完了しました。"

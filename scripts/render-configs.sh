@@ -32,6 +32,7 @@ OPENVPN_CLIENT_UPSTREAM="${OPENVPN_CLIENT_UPSTREAM:-127.0.0.1:9443}"
 MIRAKURUN_UPSTREAM="${MIRAKURUN_UPSTREAM:-127.0.0.1:40772}"
 EPGSTATION_UPSTREAM="${EPGSTATION_UPSTREAM:-127.0.0.1:8888}"
 LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
+LAN_BIND_ADDRESS="${LAN_BIND_ADDRESS:-127.0.0.1}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
 TRAEFIK_INTERNAL_PORT="${TRAEFIK_INTERNAL_PORT:-8088}"
@@ -301,9 +302,9 @@ accessLog:
 
 entryPoints:
   web:
-    address: :${HTTP_PORT}
+    address: ${LAN_BIND_ADDRESS}:${HTTP_PORT}
   websecure:
-    address: :${HTTPS_PORT}
+    address: ${LAN_BIND_ADDRESS}:${HTTPS_PORT}
   tunnel:
     address: 127.0.0.1:${TUNNEL_INTERNAL_PORT}
     forwardedHeaders:
@@ -323,8 +324,11 @@ certificatesResolvers:
     acme:
       email: ${LETSENCRYPT_EMAIL}
       storage: /letsencrypt/acme.json
-      httpChallenge:
-        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - 1.1.1.1:53
+          - 1.0.0.1:53
 
 ping: {}
 EOF

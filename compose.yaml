@@ -9,5 +9,12 @@ services:
       - ./data/letsencrypt:/letsencrypt
       - ./data/log:/var/log/traefik
       - ./.htpasswd:/etc/traefik/.htpasswd:ro
+    secrets:
+      - cloudflare_dns_api_token
     environment:
+      CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_dns_api_token
       TZ: "${TZ:-Asia/Tokyo}"
+
+secrets:
+  cloudflare_dns_api_token:
+    file: ./secrets/cloudflare_dns_api_token
