@@ -206,6 +206,12 @@ emit_tunnel_router \
   "wordpress" \
   200 \
   $'        - www-to-apex'
+emit_tunnel_router \
+  "munin" \
+  "Host(\`${MUNIN_HOST}\`)" \
+  "munin" \
+  200 \
+  $'        - protected-basic-auth\n        - munin-prefix'
 
 emit_standard_host "wordpress" "${ROOT_HOST}" "http://${WORDPRESS_UPSTREAM}"
 emit_standard_host "ttrss" "${TTRSS_HOST}" "http://${TTRSS_UPSTREAM}"
