@@ -38,15 +38,17 @@ HTTPS_PORT="${HTTPS_PORT:-443}"
 TRAEFIK_INTERNAL_PORT="${TRAEFIK_INTERNAL_PORT:-8088}"
 TUNNEL_INTERNAL_PORT="${TUNNEL_INTERNAL_PORT:-8089}"
 TRAEFIK_LOG_LEVEL="${TRAEFIK_LOG_LEVEL:-INFO}"
-BASIC_AUTH_EXEMPT_SOURCE_RANGES="${BASIC_AUTH_EXEMPT_SOURCE_RANGES:-127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fd7a:115c:a1e0::/48}"
+BASIC_AUTH_EXEMPT_SOURCE_RANGES="${BASIC_AUTH_EXEMPT_SOURCE_RANGES-}"
 
 mkdir -p data/traefik/dynamic data/letsencrypt data/log
 
-static_config="data/traefik/traefik.yml"
-dynamic_config="data/traefik/dynamic/routes.yml"
+static_target="data/traefik/traefik.yml"
+dynamic_target="data/traefik/dynamic/routes.yml"
+static_config="$(mktemp data/traefik/.traefik.XXXXXX)"
+dynamic_config="$(mktemp data/traefik/dynamic/.routes.XXXXXX)"
 routers_tmp="$(mktemp)"
 services_tmp="$(mktemp)"
-trap 'rm -f "${routers_tmp}" "${services_tmp}"' EXIT
+trap 'rm -f "${routers_tmp}" "${services_tmp}" "${static_config}" "${dynamic_config}"' EXIT
 
 emit_redirect_router() {
   local name="$1"
@@ -376,4 +378,8 @@ cat >>"${dynamic_config}" <<EOF
 EOF
 cat "${services_tmp}" >>"${dynamic_config}"
 
-echo "Rendered Traefik configuration."
+# 読み込み途中の不完全な設定が反映されないよう、完成してから置き換える。
+chmod 600 "${static_config}" "${dynamic_config}"
+mv -f "${static_config}" "${static_target}"
+mv -f "${dynamic_config}" "${dynamic_target}"
+echo "Traefik設定を生成しました。"
